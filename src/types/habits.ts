@@ -4,16 +4,25 @@ export interface Note {
 }
 
 export interface HabitData {
-  weeks: boolean[][];
-  steps: string;
-  notes: Note[];
-  streak: number;
+  id: string;
+  name: string;
+  description?: string;
+  category: 'spiritual' | 'social' | 'personal' | 'educational';
   progress: number;
+  streak: number;
+  weeks: boolean[][];
+  notes: Note[];
+  isActive: boolean;
+  startDate: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface HabitStats {
-  progress: number;
+  completedDays: number;
+  totalDays: number;
+  completionRate: number;
   streak: number;
-  totalNotes: number;
-  lastUpdated?: Date;
+  startDate: Date;
+  notesCount: number;
 }

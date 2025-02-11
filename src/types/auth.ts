@@ -1,10 +1,8 @@
 export interface RegistrationData {
   username: string;
-  nickname: string;
   password: string;
   phone: string;
-  phoneVerified?: boolean;
-  firebaseUid?: string;
+  nickname: string;
 }
 
 export interface LoginData {
@@ -17,8 +15,15 @@ export interface UserProfile {
   username: string;
   nickname: string;
   phone: string;
-  phoneVerified: boolean;
-  createdAt: Date;
-  lastLogin?: Date;
+  isAdmin: boolean;
   isActive: boolean;
+  createdAt: string;
+  lastLogin?: string;
+}
+
+export class AuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthError';
+  }
 }

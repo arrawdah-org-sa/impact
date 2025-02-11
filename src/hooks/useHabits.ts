@@ -1,99 +1,106 @@
 import { useState, useEffect } from 'react';
-import { calculateProgress, calculateStreak } from '../utils/habitCalculations';
-import { initializeHabit, createHabitData } from '../utils/habitHelpers';
+import * as habitsService from '../services/habits';
 import type { HabitData } from '../types/habits';
-import type { HabitRepository } from '../repositories/HabitRepository';
 
-export function useHabits(
-  repository: HabitRepository,
-  defaultHabits: string[]
-) {
+export function useHabits(defaultHabits: string[]) {
   const [habits, setHabits] = useState<Record<string, HabitData>>({});
   const [selectedHabit, setSelectedHabit] = useState<string | null>(null);
   const [showNotePrompt, setShowNotePrompt] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load habits from repository on mount
   useEffect(() => {
-    const loadHabits = async () => {
-      try {
-        const savedHabits = await repository.getHabits();
-        const initialHabits = initializeHabit(savedHabits, defaultHabits);
-        setHabits(initialHabits);
-      } catch (error) {
-        console.error('Error loading habits:', error);
-        // Initialize with default habits if loading fails
-        const initialHabits = initializeHabit({}, defaultHabits);
-        setHabits(initialHabits);
-      }
-    };
-
     loadHabits();
-  }, [repository, defaultHabits]);
+  }, []);
 
-  const addHabit = async (habitName: string, steps: string) => {
+  const loadHabits = async () => {
     try {
-      const newHabit = createHabitData(steps);
+      setLoading(true);
+      setError(null);
+      const habitsList = await habitsService.getHabits();
+      
+      const habitsRecord = habitsList.reduce((acc, habit) => {
+        acc[habit.name] = habit;
+        return acc;
+      }, {} as Record<string, HabitData>);
+
+      setHabits(habitsRecord);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'حدث خطأ أثناء جلب العادات';
+      setError(message);
+      console.error('Error loading habits:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addHabit = async (name: string, description: string) => {
+    try {
+      setError(null);
+      const newHabit = await habitsService.createHabit({
+        name,
+        description,
+        category: 'personal'
+      });
 
       setHabits(prev => ({
         ...prev,
-        [habitName]: newHabit
+        [newHabit.name]: newHabit
       }));
-      
-      await repository.updateHabit(habitName, newHabit);
-      setSelectedHabit(habitName);
-    } catch (error) {
-      console.error('Error adding habit:', error);
+
+      setSelectedHabit(newHabit.name);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'حدث خطأ أثناء إضافة العادة';
+      setError(message);
+      throw err;
     }
   };
 
   const updateHabitDay = async (weekIndex: number, dayIndex: number) => {
-    if (!selectedHabit) return;
+    if (!selectedHabit || !habits[selectedHabit]) return;
 
     try {
-      const updatedHabit = { ...habits[selectedHabit] };
-      const newWeeks = updatedHabit.weeks.map((week, wIndex) => 
+      setError(null);
+      const habit = habits[selectedHabit];
+      const newWeeks = habit.weeks.map((week, wIndex) => 
         wIndex === weekIndex 
           ? week.map((day, dIndex) => dIndex === dayIndex ? !day : day)
           : [...week]
       );
 
-      updatedHabit.weeks = newWeeks;
-      updatedHabit.progress = calculateProgress(newWeeks);
-      updatedHabit.streak = calculateStreak(newWeeks);
+      const updatedHabit = await habitsService.updateHabit(habit.id, {
+        weeks: newWeeks
+      });
 
       setHabits(prev => ({
         ...prev,
         [selectedHabit]: updatedHabit
       }));
 
-      await repository.updateHabit(selectedHabit, updatedHabit);
       checkForNotePrompt(newWeeks[weekIndex]);
-    } catch (error) {
-      console.error('Error updating habit:', error);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'حدث خطأ أثناء تحديث العادة';
+      setError(message);
     }
   };
 
-  const addNote = async (note: string) => {
-    if (!selectedHabit) return;
+  const addNote = async (content: string) => {
+    if (!selectedHabit || !habits[selectedHabit]) return;
 
     try {
-      const updatedHabit = {
-        ...habits[selectedHabit],
-        notes: [
-          ...habits[selectedHabit].notes,
-          { content: note, date: new Date() }
-        ]
-      };
+      setError(null);
+      const habit = habits[selectedHabit];
+      const updatedHabit = await habitsService.addNote(habit.id, content);
 
       setHabits(prev => ({
         ...prev,
         [selectedHabit]: updatedHabit
       }));
 
-      await repository.updateHabit(selectedHabit, updatedHabit);
       setShowNotePrompt(false);
-    } catch (error) {
-      console.error('Error adding note:', error);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'حدث خطأ أثناء إضافة الملاحظة';
+      setError(message);
     }
   };
 
@@ -106,9 +113,12 @@ export function useHabits(
     habits,
     selectedHabit,
     showNotePrompt,
+    loading,
+    error,
     setSelectedHabit,
     addHabit,
     updateHabitDay,
-    addNote
+    addNote,
+    refreshHabits: loadHabits
   };
 }

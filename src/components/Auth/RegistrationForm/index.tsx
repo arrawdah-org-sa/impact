@@ -24,7 +24,6 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
     e.preventDefault();
     setError('');
 
-    // Validate form
     if (!formData.username || !formData.nickname || !formData.phone || !formData.password) {
       setError('جميع الحقول مطلوبة');
       return;
